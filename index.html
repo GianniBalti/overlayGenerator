@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Overlay</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f0f0f0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        #container {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            max-width: 90%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        input[type="file"],
+        button,
+        input[type="range"] {
+            margin: 10px 0;
+            display: block;
+        }
+
+        #outputCanvasContainer {
+            margin-top: 20px;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        #outputCanvas {
+            border: 2px solid #333;
+            border-radius: 5px;
+            max-width: 100%;
+            height: auto;
+            max-height: calc(100vh - 300px); /* Adjust as needed */
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <input type="file" id="baseImageInput" accept="image/*">
+        <input type="file" id="overlayImageInput" accept="image/*">
+        <button id="overlayButton">Overlay Images</button>
+        <button id="downloadButton" style="display:none;">Download</button>
+        <input type="range" id="zoomRange" min="50" max="200" value="100">
+        <label for="zoomRange">Zoom</label>
+    </div>
+
+    <div id="outputCanvasContainer">
+        <canvas id="outputCanvas" width="1080" height="1080"></canvas>
+    </div>
+
+    <script>
+        var baseImage;
+        var overlayImage;
+        var baseImageOffsetX = 0;
+        var baseImageOffsetY = 0;
+        var zoomFactor = 1;
+        var isDragging = false;
+        var prevMouseX, prevMouseY;
+
+        var canvas = document.getElementById('outputCanvas');
+        var ctx = canvas.getContext('2d');
+
+        canvas.addEventListener('mousedown', function(event) {
+            isDragging = true;
+            prevMouseX = event.clientX;
+            prevMouseY = event.clientY;
+        });
+
+        canvas.addEventListener('mouseup', function() {
+            isDragging = false;
+        });
+
+        canvas.addEventListener('mousemove', function(event) {
+            if (isDragging) {
+                var deltaX = (event.clientX - prevMouseX) / zoomFactor;
+                var deltaY = (event.clientY - prevMouseY) / zoomFactor;
+
+                baseImageOffsetX += deltaX;
+                baseImageOffsetY += deltaY;
+
+                drawCanvas();
+                
+                prevMouseX = event.clientX;
+                prevMouseY = event.clientY;
+            }
+        });
+
+        document.getElementById('overlayButton').addEventListener('click', function () {
+            var baseImageInput = document.getElementById('baseImageInput');
+            var overlayImageInput = document.getElementById('overlayImageInput');
+
+            if (baseImageInput.files.length === 0 || overlayImageInput.files.length === 0) {
+                alert('Please select both base and overlay images.');
+                return;
+            }
+
+            baseImage = new Image();
+            baseImage.onload = function () {
+                overlayImage = new Image();
+                overlayImage.onload = function () {
+                    drawCanvas();
+                    document.getElementById('downloadButton').style.display = 'inline';
+                };
+                overlayImage.src = URL.createObjectURL(overlayImageInput.files[0]);
+            };
+            baseImage.src = URL.createObjectURL(baseImageInput.files[0]);
+        });
+
+        document.getElementById('downloadButton').addEventListener('click', function () {
+            var outputCanvas = document.createElement('canvas');
+            outputCanvas.width = 1080;
+            outputCanvas.height = 1080;
+            var outputCtx = outputCanvas.getContext('2d');
+            outputCtx.drawImage(canvas, 0, 0, outputCanvas.width, outputCanvas.height);
+            var outputImageData = outputCanvas.toDataURL('image/jpeg');
+
+            // Download the result
+            var link = document.createElement('a');
+            link.href = outputImageData;
+            link.download = 'output_image.jpg';
+            link.click();
+        });
+
+        document.getElementById('zoomRange').addEventListener('input', function () {
+            zoomFactor = parseFloat(this.value) / 100;
+            drawCanvas();
+        });
+
+        function drawCanvas() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            if (baseImage && overlayImage) {
+                var baseAspectRatio = baseImage.width / baseImage.height;
+                var outputWidth, outputHeight;
+
+                // Calculate the scaling factors for width and height
+                var widthScale = canvas.width / baseImage.width;
+                var heightScale = canvas.height / baseImage.height;
+
+                if (widthScale > heightScale) {
+                    outputWidth = canvas.width;
+                    outputHeight = baseImage.height * widthScale;
+                } else {
+                    outputHeight = canvas.height;
+                    outputWidth = baseImage.width * heightScale;
+                }
+
+                // Apply zoom factor
+                outputWidth *= zoomFactor;
+                outputHeight *= zoomFactor;
+
+                // Draw the base image with the offset and zoom
+                ctx.drawImage(baseImage, baseImageOffsetX, baseImageOffsetY, outputWidth, outputHeight);
+
+                // Draw the overlay image
+                ctx.drawImage(overlayImage, 0, 0, canvas.width, canvas.height);
+            }
+        }
+    </script>
+</body>
+</html>
